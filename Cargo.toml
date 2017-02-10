@@ -1,0 +1,9 @@
+[package]
+name = "blocks"
+version = "0.1.0"
+authors = ["frede <frederik.glasmachers@tu-dortmund.de>"]
+
+[dependencies]
+glium = "*"
+nalgebra = "*"
+image = "*"
