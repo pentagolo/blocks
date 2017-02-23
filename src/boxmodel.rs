@@ -89,13 +89,13 @@ impl Model {
 
                 uniform sampler1D box_type_face_tile_map_tex;
 
-                in vec3 box_pos;
-                in float box_type;
+                attribute vec3 box_pos;
+                attribute float box_type;
 
-                in vec3 position;
-                in vec3 normal;
-                in float face;
-                in vec2 tex_coord;
+                attribute vec3 position;
+                attribute vec3 normal;
+                attribute float face;
+                attribute vec2 tex_coord;
 
                 //varying vec3 v_normal;
                 varying vec3 v_position;
