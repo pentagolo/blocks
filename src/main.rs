@@ -54,11 +54,24 @@ fn main() {
     let box_model = boxmodel::Model::new(&display);
     let tiles = boxmodel::Tiles::new(
         boxmodel::box_type_face_tile_map_tex_from_array(&display, &[
-            0, 0, 0, 0, 0, 0
+            0*16+3, 0*16+3, 0*16+3, 0*16+3, 0*16+2, 9*16+2
         ]),
-        boxmodel::tile_color_tex_array_from_images(&display, &[
-            image::load(Cursor::new(&include_bytes!("boxes2.png")[..]), image::PNG).unwrap().to_rgba()
-        ])
+        {
+            let mut images = (0..256).map(|i| {
+                image::RgbaImage::from_raw(16, 16, vec![0; 256*4]).unwrap()
+            }).collect::<Vec<_>>();
+            let image = image::load(Cursor::new(&include_bytes!("boxes.png")[..]), image::PNG).unwrap().to_rgba();
+            for ix in 0..16usize {
+                for iy in 0..16usize {
+                    for px in 0..16usize {
+                        for py in 0..16usize {
+                            images[ix+iy*16].put_pixel(px as u32, py as u32, *image.get_pixel((ix*16+px) as u32, (iy*16+py) as u32));
+                        }
+                    }
+                }
+            }
+            boxmodel::tile_color_tex_array_from_images(&display, &images)
+        }
     );
 
     let persp_mat: nalgebra::PerspectiveMatrix3<f32> = nalgebra::PerspectiveMatrix3::new(
@@ -102,8 +115,8 @@ fn main() {
             box_tree.cast_view(origin, planes, max_dist as f64, &mut |box_pos: na::Vector3<u32>, leaf| {
                 data.push(
                     boxmodel::Instance {
-                        box_pos: [box_pos.x, box_pos.y, box_pos.z],
-                        box_type: 0/*leaf.box_spec() as u32*/,
+                        box_pos: [box_pos.x as f32, box_pos.y as f32, box_pos.z as f32],
+                        box_type: 0/*leaf.box_spec() as u32*/ as f32,
                     }
                 );
             });

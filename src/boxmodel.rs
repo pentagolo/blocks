@@ -13,7 +13,7 @@ pub struct Vertex {
     /// Normal of the vertex.
     pub normal: [f32; 3],
     /// Face index between 0 and 5 this vertex belongs to.
-    pub face: u32,
+    pub face: f32,
     /// Texture coordinate.
     pub tex_coord: [f32; 2],
 }
@@ -25,9 +25,9 @@ pub type VertexBuffer = glium::VertexBuffer<Vertex>;
 #[derive(Copy, Clone)]
 pub struct Instance {
     /// The position of the box in the world.
-    pub box_pos: [u32; 3],
+    pub box_pos: [f32; 3],
     /// The type of the box.
-    pub box_type: u32,
+    pub box_type: f32,
 }
 implement_vertex!(Instance, box_pos, box_type);
 /// Type of the instance buffer.
@@ -45,13 +45,15 @@ pub fn box_type_face_tile_map_tex_from_array<F: glium::backend::Facade>(facade: 
 }
 
 /// The tile color texture array is an 2d texture array. Each texture is filled with the tiles colors.
-pub type TileColorTexArray = glium::texture::Texture2dArray;
+pub type TileColorTexArray = glium::texture::Texture2d;
 pub fn tile_color_tex_array_from_images<F: glium::backend::Facade>(facade: &F, images: &[image::RgbaImage]) -> TileColorTexArray {
-    let images = images.iter().map(|image| {
+    /*let images = images.iter().map(|image| {
         let dimensions = image.dimensions();
         glium::texture::RawImage2d::from_raw_rgba_reversed(image.to_vec(), dimensions)
-    }).collect::<Vec<_>>();
-    TileColorTexArray::new(facade, images).unwrap()
+    }).collect::<Vec<_>>();*/
+    let dimensions = images[0].dimensions();
+    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(images[0].to_vec(), dimensions);
+    TileColorTexArray::new(facade, image).unwrap()
 }
 
 pub struct Tiles {
@@ -83,22 +85,22 @@ impl Model {
     pub fn new<F: glium::backend::Facade>(facade: &F) -> Model {
         let program = {
             let vertex_shader_src = r#"
-                #version 150
+                #version 120
 
                 uniform sampler1D box_type_face_tile_map_tex;
 
-                in uvec3 box_pos;
-                in uint box_type;
+                in vec3 box_pos;
+                in float box_type;
 
                 in vec3 position;
                 in vec3 normal;
-                in uint face;
+                in float face;
                 in vec2 tex_coord;
 
-                out vec3 v_normal;
-                out vec3 v_position;
-                out vec3 v_tex_coord;
-                out vec3 v_color;
+                //varying vec3 v_normal;
+                varying vec3 v_position;
+                varying vec2 v_tex_coord;
+                varying vec3 v_color;
 
                 uniform mat4 matrix;
 
@@ -107,29 +109,23 @@ impl Model {
                         box_tex_index % 16,
                         box_tex_index / 16,
                     ));*/
-                    if (box_type == uint(0)) {
-                        v_color = vec3(1.0, 0.0, 0.0);
-                    } else {
-                        v_color = vec3(0.0, 0.0, 0.0);
-                    }
-                    vec4 value = texelFetch(box_type_face_tile_map_tex, int(box_type) * 6 + int(face), 0);
-                    v_tex_coord = vec3(tex_coord, value.r);
-                    v_normal = transpose(inverse(mat3(matrix))) * normal;
+                    vec4 value = texture1D(box_type_face_tile_map_tex, (box_type * 6 + face + 0.5) / 256);
+                    v_tex_coord = vec2(tex_coord/*, value.r * 65536*/);
+                    v_color = vec3(value.r, 0.0, 0.0);
+                    //v_normal = transpose(inverse(mat3(matrix))) * normal;
                     gl_Position = matrix * vec4(position + box_pos, 1.0);
                     v_position = gl_Position.xyz / gl_Position.w;
                 }
             "#;
             let fragment_shader_src = r#"
-                #version 150
+                #version 120
 
-                uniform sampler2DArray tile_color_tex_array;
+                uniform sampler2D tile_color_tex_array;
 
-                in vec3 v_normal;
-                in vec3 v_position;
-                in vec3 v_tex_coord;
-                in vec3 v_color;
-
-                out vec4 color;
+                varying vec3 v_normal;
+                varying vec3 v_position;
+                varying vec2 v_tex_coord;
+                varying vec3 v_color;
 
                 const vec3 light = vec3(-1.0, 0.4, 0.9);
 
@@ -138,15 +134,15 @@ impl Model {
                 const vec3 specular_color = vec3(0.2, 0.2, 0.2);
 
                 void main() {
-                    float diffuse = max(dot(normalize(v_normal), normalize(light)), 0.0);
+                    /*float diffuse = max(dot(normalize(v_normal), normalize(light)), 0.0);
 
                     vec3 camera_dir = normalize(-v_position);
                     vec3 half_direction = normalize(normalize(light) + camera_dir);
-                    float specular = pow(max(dot(half_direction, normalize(v_normal)), 0.0), 16.0);
+                    float specular = pow(max(dot(half_direction, normalize(v_normal)), 0.0), 16.0);*/
 
-                    color = vec4(texture(tile_color_tex_array, v_tex_coord).rgb * (ambient_color + diffuse * diffuse_color + specular * specular_color), 1.0);
-                    //color = texture(color_tex, v_tex_coord);
-                    //color = vec4(v_color, 1);
+                    //color = vec4(texture2D(tile_color_tex_array, v_tex_coord).rgb * (ambient_color + diffuse * diffuse_color + specular * specular_color), 1.0);
+                    gl_FragColor = texture2D(tile_color_tex_array, v_tex_coord);
+                    //gl_FragColor = vec4(v_color, 1);
                 }
             "#;
             glium::Program::from_source(facade, vertex_shader_src, fragment_shader_src, None).unwrap()
@@ -169,7 +165,7 @@ impl Model {
                 Vertex {
                     position: pos,
                     normal: pos,
-                    face: 0,
+                    face: 0 as f32,
                     tex_coord: [0.0, 0.0],
                 }
             }).collect::<Vec<Vertex>>();
@@ -187,7 +183,7 @@ impl Model {
                     }
                 }
                 for v in 0..6 {
-                    vertices[f*6 + v].face = f as u32;
+                    vertices[f*6 + v].face = f as f32;
                     vertices[f*6 + v].tex_coord = [tex_coords[v].0 as f32, tex_coords[v].1 as f32];
                 }
             }
